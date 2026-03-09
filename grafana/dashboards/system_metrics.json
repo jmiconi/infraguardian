@@ -23,7 +23,90 @@
     {
       "datasource": {
         "type": "grafana-postgresql-datasource",
-        "uid": "aff7ob39brhfkc"
+        "uid": "PC6B99A0815D40451"
+      },
+      "fieldConfig": {
+        "defaults": {
+          "color": {
+            "mode": "thresholds"
+          },
+          "mappings": [],
+          "thresholds": {
+            "mode": "absolute",
+            "steps": [
+              {
+                "color": "green",
+                "value": 0
+              },
+              {
+                "color": "red",
+                "value": 80
+              }
+            ]
+          },
+          "unit": "percent"
+        },
+        "overrides": []
+      },
+      "gridPos": {
+        "h": 8,
+        "w": 12,
+        "x": 0,
+        "y": 0
+      },
+      "id": 2,
+      "options": {
+        "colorMode": "value",
+        "graphMode": "area",
+        "justifyMode": "auto",
+        "orientation": "horizontal",
+        "percentChangeColorMode": "standard",
+        "reduceOptions": {
+          "calcs": [
+            "lastNotNull"
+          ],
+          "fields": "",
+          "values": true
+        },
+        "showPercentChange": false,
+        "textMode": "auto",
+        "wideLayout": true
+      },
+      "pluginVersion": "12.4.0",
+      "targets": [
+        {
+          "dataset": "infraguardian",
+          "editorMode": "code",
+          "format": "table",
+          "rawQuery": true,
+          "rawSql": "SELECT\n  sensor AS metric,\n  value\nFROM metrics\nWHERE device = '$device'\nORDER BY timestamp DESC\nLIMIT 3",
+          "refId": "A",
+          "sql": {
+            "columns": [
+              {
+                "parameters": [],
+                "type": "function"
+              }
+            ],
+            "groupBy": [
+              {
+                "property": {
+                  "type": "string"
+                },
+                "type": "groupBy"
+              }
+            ],
+            "limit": 50
+          }
+        }
+      ],
+      "title": "Last Value",
+      "type": "stat"
+    },
+    {
+      "datasource": {
+        "type": "grafana-postgresql-datasource",
+        "uid": "PC6B99A0815D40451"
       },
       "fieldConfig": {
         "defaults": {
@@ -58,7 +141,7 @@
             "spanNulls": false,
             "stacking": {
               "group": "A",
-              "mode": "none"
+              "mode": "normal"
             },
             "thresholdsStyle": {
               "mode": "line"
@@ -85,7 +168,7 @@
         "h": 8,
         "w": 12,
         "x": 0,
-        "y": 0
+        "y": 8
       },
       "id": 1,
       "options": {
@@ -112,7 +195,7 @@
           "editorMode": "code",
           "format": "time_series",
           "rawQuery": true,
-          "rawSql": "SELECT\n  timestamp AS \"time\",\n  sensor AS \"metric\",\n  value\nFROM metrics\nWHERE $__timeFilter(timestamp)\nORDER BY 1;",
+          "rawSql": "SELECT\n  timestamp AS \"time\",\n  sensor AS metric,\n  value\nFROM metrics\nWHERE device = '$device'\n  AND sensor IN ('cpu_usage','ram_usage','disk_usage')\nORDER BY 1",
           "refId": "A",
           "sql": {
             "columns": [
@@ -134,7 +217,7 @@
           "table": "metrics"
         }
       ],
-      "title": "New panel",
+      "title": "Final Panel",
       "type": "timeseries"
     }
   ],
@@ -143,16 +226,61 @@
   "schemaVersion": 42,
   "tags": [],
   "templating": {
-    "list": []
+    "list": [
+      {
+        "current": {
+          "text": "a2d8d672a14d",
+          "value": "a2d8d672a14d"
+        },
+        "datasource": {
+          "type": "grafana-postgresql-datasource",
+          "uid": "PC6B99A0815D40451"
+        },
+        "definition": "SELECT DISTINCT device FROM metrics ORDER BY device",
+        "label": "Device",
+        "name": "device",
+        "options": [],
+        "query": {
+          "dataset": "infraguardian",
+          "editorMode": "code",
+          "format": "table",
+          "query": "SELECT DISTINCT device FROM metrics ORDER BY device",
+          "rawQuery": true,
+          "rawSql": "SELECT DISTINCT device FROM metrics ORDER BY device",
+          "refId": "SQLVariableQueryEditor-VariableQuery",
+          "sql": {
+            "columns": [
+              {
+                "parameters": [],
+                "type": "function"
+              }
+            ],
+            "groupBy": [
+              {
+                "property": {
+                  "type": "string"
+                },
+                "type": "groupBy"
+              }
+            ],
+            "limit": 50
+          }
+        },
+        "refresh": 1,
+        "regex": "",
+        "regexApplyTo": "value",
+        "type": "query"
+      }
+    ]
   },
   "time": {
-    "from": "now-6h",
+    "from": "now-30m",
     "to": "now"
   },
   "timepicker": {},
   "timezone": "browser",
-  "title": "Cspu Usage Test",
-  "uid": "ad2c8pf",
-  "version": 7,
+  "title": "InfraGuardian - Monitor Panel",
+  "uid": "adbz77n",
+  "version": 1,
   "weekStart": ""
 }
