@@ -1,64 +1,153 @@
 # InfraGuardian
 
-InfraGuardian is a lightweight infrastructure monitoring platform built with Docker, PostgreSQL and Grafana.
+InfraGuardian is a lightweight infrastructure observability stack built with:
 
-The project collects system metrics from hosts and stores them in PostgreSQL for visualization in Grafana dashboards.
+- Docker
+- PostgreSQL
+- Python
+- Grafana
+
+It collects basic system metrics from a host, stores them in PostgreSQL, and visualizes them in Grafana.
+
+## Features
+
+- CPU usage collection
+- RAM usage collection
+- Disk usage collection
+- PostgreSQL as metrics storage
+- Grafana datasource provisioning
+- Docker Compose deployment
+- Environment-based configuration
 
 ## Architecture
 
-Collector → PostgreSQL → Grafana
+InfraGuardian currently includes three main components:
 
-The collector gathers metrics such as:
+- **collector**  
+  A Python-based collector that gathers system metrics.
 
-- CPU usage
-- RAM usage
-- Disk usage
+- **postgres**  
+  A PostgreSQL database used to store collected metrics.
 
-These metrics are stored as time-series data in PostgreSQL and visualized through Grafana dashboards.
+- **grafana**  
+  A Grafana instance used to query and visualize metrics.
 
-## Stack
+## Collected metrics
 
-- Python
-- PostgreSQL
-- Grafana
-- Docker
+The collector currently stores the following metrics:
 
-## Quick Start
+- `cpu_usage`
+- `ram_usage`
+- `disk_usage`
+
+## Project structure
+
+```text
+collector/
+  collector.py
+  Dockerfile
+  requirements.txt
+
+db/
+  init/
+    01-init.sql
+  data/
+
+grafana/
+  dashboards/
+    system_metrics.json
+  provisioning/
+    dashboards/
+    datasources/
+  data/
+
+docker-compose.yml
+.env.example
+README.md
+
+
+
+
+Requirements
+
+Docker
+
+Docker Compose
+
+Quick start
 
 Clone the repository:
-git clone https://github.com/YOURUSER/infraguardian.git
 
+git clone https://github.com/YOUR_USERNAME/infraguardian.git
 cd infraguardian
 
-Create environment file:
+Create your environment file:
+
 cp .env.example .env
 
 Start the stack:
-docker compose up -d
 
-Grafana will be available at:
-http://localhost:3000
+docker compose up -d --build
+Services
 
-Default credentials:
-admin / admin
+Grafana: http://localhost:3000
 
-## Current Features (v0.0.1)
+PostgreSQL: localhost:5432
 
-- System metrics collector
-- PostgreSQL time-series storage
-- Grafana visualization
-- Docker-based deployment
+Default Grafana credentials
 
-## Roadmap
+Username: admin
 
-v0.0.2
-- Multi-host agents
-- Linux / Windows support
+Password: admin
 
-v0.0.3
-- Anomaly detection
-- AI-assisted diagnostics
+Database schema
 
-## License
+The main table is:
+
+metrics
+
+Columns:
+
+id
+
+timestamp
+
+device
+
+sensor
+
+value
+
+status
+
+Current status
+
+InfraGuardian v0.0.1 provides a functional local observability base with:
+
+Docker Compose orchestration
+
+PostgreSQL metrics ingestion
+
+Python collector
+
+Grafana provisioning
+
+Environment variable support for configuration
+
+Roadmap
+
+Multi-host support
+
+Linux agents
+
+Windows agents
+
+Dynamic dashboards
+
+Event correlation
+
+AI-assisted observability features
+
+License
 
 MIT

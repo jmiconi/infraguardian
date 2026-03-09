@@ -4,36 +4,78 @@ services:
     image: postgres:16
     container_name: ig-postgres
     restart: always
+
     environment:
       POSTGRES_DB: ${POSTGRES_DB}
       POSTGRES_USER: ${POSTGRES_USER}
       POSTGRES_PASSWORD: ${POSTGRES_PASSWORD}
       TZ: America/Argentina/Buenos_Aires
+
     volumes:
       - ./db/data:/var/lib/postgresql/data
+
     ports:
       - "5432:5432"
+
+    networks:
+      - infraguardian
+
+    healthcheck:
+      test: ["CMD-SHELL", "pg_isready -h localhost -U ${POSTGRES_USER} -d ${POSTGRES_DB}"]
+      interval: 10s
+      timeout: 5s
+      retries: 5
+
 
   collector:
     build: ./collector
     container_name: ig-collector
-    depends_on:
-      - postgres
     restart: always
+
     environment:
-      POSTGRES_HOST: postgres
+      POSTGRES_HOST: ${POSTGRES_HOST}
+      POSTGRES_PORT: ${POSTGRES_PORT}
+      POSTGRES_DB: ${POSTGRES_DB}
+      POSTGRES_USER: ${POSTGRES_USER}
+      POSTGRES_PASSWORD: ${POSTGRES_PASSWORD}
+      COLLECTOR_INTERVAL: ${COLLECTOR_INTERVAL}
+  
+    depends_on:
+      postgres:
+        condition: service_healthy
+  
+    networks:
+      - infraguardian
+
+
+  grafana:
+    image: grafana/grafana
+    container_name: ig-grafana
+    restart: always
+
+    ports:
+      - "3000:3000"
+
+    environment:
+      POSTGRES_HOST: ig-postgres
+      POSTGRES_PORT: "5432"
       POSTGRES_DB: ${POSTGRES_DB}
       POSTGRES_USER: ${POSTGRES_USER}
       POSTGRES_PASSWORD: ${POSTGRES_PASSWORD}
 
-  grafana:
-    user: "472"
-    image: grafana/grafana
-    container_name: ig-grafana
-    restart: always
-    ports:
-      - "3000:3000"
     volumes:
       - ./grafana/data:/var/lib/grafana
+      - ./grafana/provisioning:/etc/grafana/provisioning
+      - ./grafana/dashboards:/var/lib/grafana/dashboards
+  
     depends_on:
-      - postgres
+      postgres:
+        condition: service_healthy
+
+    networks:
+      - infraguardian
+
+
+networks:
+  infraguardian:
+    driver: bridge

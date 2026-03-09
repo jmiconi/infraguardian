@@ -3,92 +3,118 @@ import time
 import socket
 import psutil
 import psycopg2
-from datetime import datetime
 
 
 # -----------------------------------------
-# CONFIGURACIÓN DE BASE DE DATOS
+# CONFIGURACIÓN
+# -----------------------------------------
+# Todas las variables salen del entorno.
+# Esto permite que el collector sea portable
+# y no dependa de valores hardcodeados.
+# Si alguna variable no existe, usamos un valor
+# por defecto razonable para el lab/proyecto.
 # -----------------------------------------
 
-DB_HOST = os.getenv("POSTGRES_HOST", "postgres")
-DB_NAME = os.getenv("POSTGRES_DB")
-DB_USER = os.getenv("POSTGRES_USER")
-DB_PASS = os.getenv("POSTGRES_PASSWORD")
+DB_HOST = os.getenv("POSTGRES_HOST", "ig-postgres")
+DB_PORT = int(os.getenv("POSTGRES_PORT", "5432"))
+DB_NAME = os.getenv("POSTGRES_DB", "infraguardian")
+DB_USER = os.getenv("POSTGRES_USER", "igadmin")
+DB_PASS = os.getenv("POSTGRES_PASSWORD", "")
+COLLECTOR_INTERVAL = int(os.getenv("COLLECTOR_INTERVAL", "30"))
+
 
 # -----------------------------------------
 # FUNCIÓN: CONECTAR A POSTGRESQL
 # -----------------------------------------
+# Intenta conectarse hasta que la base esté
+# disponible. Esto es útil en Docker, porque
+# el collector puede arrancar antes que Postgres.
+# -----------------------------------------
 
 def connect_db():
-    """
-    Intenta conectarse a PostgreSQL hasta que esté disponible.
-    Esto es necesario porque Docker puede levantar
-    el collector antes que la base de datos.
-    """
-
     while True:
         try:
             conn = psycopg2.connect(
                 host=DB_HOST,
+                port=DB_PORT,
                 database=DB_NAME,
                 user=DB_USER,
                 password=DB_PASS
             )
 
-            print(f"Collector connected to PostgreSQL: {DB_NAME} on {DB_HOST}")
+            print(
+                f"[OK] Collector connected to PostgreSQL: "
+                f"{DB_NAME} on {DB_HOST}:{DB_PORT}"
+            )
             return conn
 
         except Exception as e:
-
-            print("PostgreSQL no disponible todavía...")
-            print("Reintentando en 5 segundos")
-
+            print("[WARN] PostgreSQL no disponible todavía")
+            print(f"[DETAIL] {e}")
+            print("[INFO] Reintentando en 5 segundos...")
             time.sleep(5)
 
 
 # -----------------------------------------
-# FUNCIÓN: GUARDAR MÉTRICA
+# FUNCIÓN: GUARDAR MÉTRICAS
+# -----------------------------------------
+# Guarda las 3 métricas del ciclo usando
+# una sola conexión y una sola transacción.
+# Esto reduce overhead y deja el collector
+# más prolijo para crecer después.
 # -----------------------------------------
 
-def save_metric(device, sensor, value, status):
-    """
-    Inserta una métrica en la base de datos.
+def save_metrics(device, cpu, ram, disk):
+    conn = None
+    cursor = None
 
-    IMPORTANTE:
-    El timestamp lo genera PostgreSQL con NOW()
-    para evitar problemas de timezone.
-    """
+    try:
+        conn = connect_db()
+        cursor = conn.cursor()
 
-    conn = connect_db()
-    cursor = conn.cursor()
+        query = """
+        INSERT INTO metrics (timestamp, device, sensor, value, status)
+        VALUES (NOW(), %s, %s, %s, %s)
+        """
 
-    query = """
-    INSERT INTO metrics (timestamp, device, sensor, value, status)
-    VALUES (NOW(), %s, %s, %s, %s)
-    """
+        metrics = [
+            (device, "cpu_usage", cpu, "ok"),
+            (device, "ram_usage", ram, "ok"),
+            (device, "disk_usage", disk, "ok")
+        ]
 
-    cursor.execute(
-        query,
-        (device, sensor, value, status)
-    )
+        cursor.executemany(query, metrics)
+        conn.commit()
 
-    conn.commit()
+        print(f"[OK] Métricas guardadas para device={device}")
+        print(f"     cpu_usage  = {cpu}")
+        print(f"     ram_usage  = {ram}")
+        print(f"     disk_usage = {disk}")
 
-    cursor.close()
-    conn.close()
+    except Exception as e:
+        print("[ERROR] No se pudieron guardar las métricas en PostgreSQL")
+        print(f"[DETAIL] {e}")
 
-    print(f"Métrica guardada → {sensor}: {value}")
+        if conn:
+            conn.rollback()
+
+    finally:
+        if cursor:
+            cursor.close()
+        if conn:
+            conn.close()
 
 
 # -----------------------------------------
 # FUNCIÓN: OBTENER MÉTRICAS DEL SISTEMA
 # -----------------------------------------
+# device = hostname del contenedor/equipo
+# cpu    = porcentaje de CPU
+# ram    = porcentaje de RAM usada
+# disk   = porcentaje de disco usado en /
+# -----------------------------------------
 
 def collect_metrics():
-    """
-    Obtiene métricas básicas del sistema.
-    """
-
     device = socket.gethostname()
 
     cpu = psutil.cpu_percent(interval=1)
@@ -101,18 +127,18 @@ def collect_metrics():
 # -----------------------------------------
 # LOOP PRINCIPAL
 # -----------------------------------------
+# Ciclo infinito:
+# 1. toma métricas
+# 2. las guarda en DB
+# 3. espera el intervalo configurado
+# -----------------------------------------
 
 if __name__ == "__main__":
-
-    print("InfraGuardian Collector iniciado")
+    print("[INFO] InfraGuardian Collector iniciado")
+    print(f"[INFO] Intervalo de recolección: {COLLECTOR_INTERVAL} segundos")
+    print(f"[INFO] Destino PostgreSQL: {DB_HOST}:{DB_PORT}/{DB_NAME}")
 
     while True:
-
         device, cpu, ram, disk = collect_metrics()
-
-        save_metric(device, "cpu_usage", cpu, "ok")
-        save_metric(device, "ram_usage", ram, "ok")
-        save_metric(device, "disk_usage", disk, "ok")
-
-        # Esperamos 30 segundos
-        time.sleep(10)
+        save_metrics(device, cpu, ram, disk)
+        time.sleep(COLLECTOR_INTERVAL)
