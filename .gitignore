@@ -1,0 +1,20 @@
+# Environment variables
+.env
+
+# Python
+__pycache__/
+*.pyc
+
+# PostgreSQL data
+db/data/
+
+# Grafana data
+grafana/data/
+
+# Backups
+*.backup
+*.tar
+
+# Editor files
+.vscode
+.idea
