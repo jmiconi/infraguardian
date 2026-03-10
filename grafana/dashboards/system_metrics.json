@@ -195,7 +195,7 @@
           "editorMode": "code",
           "format": "time_series",
           "rawQuery": true,
-          "rawSql": "SELECT\n  timestamp AS \"time\",\n  sensor AS metric,\n  value\nFROM metrics\nWHERE device = '$device'\n  AND sensor IN ('cpu_usage','ram_usage','disk_usage')\nORDER BY 1",
+          "rawSql": "SELECT\n  timestamp AS \"time\",\n  value,\n  sensor AS metric\nFROM metrics\nWHERE $__timeFilter(timestamp)\nORDER BY timestamp;",
           "refId": "A",
           "sql": {
             "columns": [

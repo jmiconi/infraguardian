@@ -13,15 +13,15 @@ services:
       POSTGRES_USER: ${POSTGRES_USER}
       POSTGRES_PASSWORD: ${POSTGRES_PASSWORD}
 
-      # Container timezone
-      TZ: America/Argentina/Buenos_Aires
-
     volumes:
       # Persistent database storage
       - ./db/data:/var/lib/postgresql/data
 
       # Initialization scripts executed only on first DB creation
       - ./db/init:/docker-entrypoint-initdb.d
+
+      - /etc/localtime:/etc/localtime:ro
+      - /etc/timezone:/etc/timezone:ro
 
     ports:
       # Expose PostgreSQL to host for debugging or external access
@@ -56,6 +56,9 @@ services:
       # Metric collection interval (seconds)
       COLLECTOR_INTERVAL: ${COLLECTOR_INTERVAL}
 
+    volumes:
+      - /etc/localtime:/etc/localtime:ro
+      - /etc/timezone:/etc/timezone:ro
     depends_on:
       # Wait until PostgreSQL is healthy before starting
       postgres:
@@ -93,6 +96,9 @@ services:
 
       # Predefined dashboards
       - ./grafana/dashboards:/var/lib/grafana/dashboards
+
+      - /etc/localtime:/etc/localtime:ro
+      - /etc/timezone:/etc/timezone:ro
 
     depends_on:
       postgres:
