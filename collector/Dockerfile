@@ -1,21 +1,21 @@
-# Imagen base de Python
+# Base Python image for the InfraGuardian collector
 FROM python:3.11-slim
 
-# Evitar archivos .pyc y forzar logs sin buffer
+# Avoid .pyc files and force unbuffered logs
 ENV PYTHONDONTWRITEBYTECODE=1
 ENV PYTHONUNBUFFERED=1
 
-# Carpeta de trabajo dentro del container
+# Set the working directory inside the container
 WORKDIR /app
 
-# Copiamos dependencias
+# Copy dependency list first to improve Docker layer caching
 COPY requirements.txt .
 
-# Instalamos dependencias
+# Install Python dependencies
 RUN pip install --no-cache-dir -r requirements.txt
 
-# Copiamos el código del collector
+# Copy the collector source code
 COPY collector.py .
 
-# Ejecutar script al iniciar container
+# Start the collector when the container launches
 CMD ["python", "collector.py"]

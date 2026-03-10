@@ -6,13 +6,12 @@ import psycopg2
 
 
 # -----------------------------------------
-# CONFIGURACIÓN
+# CONFIGURATION
 # -----------------------------------------
-# Todas las variables salen del entorno.
-# Esto permite que el collector sea portable
-# y no dependa de valores hardcodeados.
-# Si alguna variable no existe, usamos un valor
-# por defecto razonable para el lab/proyecto.
+# All values are loaded from environment variables.
+# This keeps the collector portable and avoids hardcoded settings.
+# If a variable is not defined, a reasonable default is used
+# for lab or development environments.
 # -----------------------------------------
 
 DB_HOST = os.getenv("POSTGRES_HOST", "ig-postgres")
@@ -24,11 +23,11 @@ COLLECTOR_INTERVAL = int(os.getenv("COLLECTOR_INTERVAL", "30"))
 
 
 # -----------------------------------------
-# FUNCIÓN: CONECTAR A POSTGRESQL
+# FUNCTION: CONNECT TO POSTGRESQL
 # -----------------------------------------
-# Intenta conectarse hasta que la base esté
-# disponible. Esto es útil en Docker, porque
-# el collector puede arrancar antes que Postgres.
+# Tries to connect until the database becomes available.
+# This is useful in Docker environments because the collector
+# may start before the PostgreSQL container is fully ready.
 # -----------------------------------------
 
 def connect_db():
@@ -49,19 +48,19 @@ def connect_db():
             return conn
 
         except Exception as e:
-            print("[WARN] PostgreSQL no disponible todavía")
+            print("[WARN] PostgreSQL not available yet")
             print(f"[DETAIL] {e}")
-            print("[INFO] Reintentando en 5 segundos...")
+            print("[INFO] Retrying in 5 seconds...")
             time.sleep(5)
 
 
 # -----------------------------------------
-# FUNCIÓN: GUARDAR MÉTRICAS
+# FUNCTION: SAVE METRICS
 # -----------------------------------------
-# Guarda las 3 métricas del ciclo usando
-# una sola conexión y una sola transacción.
-# Esto reduce overhead y deja el collector
-# más prolijo para crecer después.
+# Saves the metrics collected in the current cycle
+# using a single connection and transaction.
+# This reduces overhead and keeps the collector
+# simple enough for future expansion.
 # -----------------------------------------
 
 def save_metrics(device, cpu, ram, disk):
@@ -77,6 +76,8 @@ def save_metrics(device, cpu, ram, disk):
         VALUES (NOW(), %s, %s, %s, %s)
         """
 
+        # One row is stored per metric type.
+        # This keeps the schema flexible for future sensors.
         metrics = [
             (device, "cpu_usage", cpu, "ok"),
             (device, "ram_usage", ram, "ok"),
@@ -86,13 +87,13 @@ def save_metrics(device, cpu, ram, disk):
         cursor.executemany(query, metrics)
         conn.commit()
 
-        print(f"[OK] Métricas guardadas para device={device}")
+        print(f"[OK] Metrics stored for device={device}")
         print(f"     cpu_usage  = {cpu}")
         print(f"     ram_usage  = {ram}")
         print(f"     disk_usage = {disk}")
 
     except Exception as e:
-        print("[ERROR] No se pudieron guardar las métricas en PostgreSQL")
+        print("[ERROR] Failed to store metrics in PostgreSQL")
         print(f"[DETAIL] {e}")
 
         if conn:
@@ -106,12 +107,12 @@ def save_metrics(device, cpu, ram, disk):
 
 
 # -----------------------------------------
-# FUNCIÓN: OBTENER MÉTRICAS DEL SISTEMA
+# FUNCTION: COLLECT SYSTEM METRICS
 # -----------------------------------------
-# device = hostname del contenedor/equipo
-# cpu    = porcentaje de CPU
-# ram    = porcentaje de RAM usada
-# disk   = porcentaje de disco usado en /
+# device = hostname reported by the runtime environment
+# cpu    = CPU usage percentage
+# ram    = RAM usage percentage
+# disk   = disk usage percentage for "/"
 # -----------------------------------------
 
 def collect_metrics():
@@ -125,18 +126,18 @@ def collect_metrics():
 
 
 # -----------------------------------------
-# LOOP PRINCIPAL
+# MAIN LOOP
 # -----------------------------------------
-# Ciclo infinito:
-# 1. toma métricas
-# 2. las guarda en DB
-# 3. espera el intervalo configurado
+# Infinite loop:
+# 1. collect metrics
+# 2. store them in the database
+# 3. wait for the configured interval
 # -----------------------------------------
 
 if __name__ == "__main__":
-    print("[INFO] InfraGuardian Collector iniciado")
-    print(f"[INFO] Intervalo de recolección: {COLLECTOR_INTERVAL} segundos")
-    print(f"[INFO] Destino PostgreSQL: {DB_HOST}:{DB_PORT}/{DB_NAME}")
+    print("[INFO] InfraGuardian Collector started")
+    print(f"[INFO] Collection interval: {COLLECTOR_INTERVAL} seconds")
+    print(f"[INFO] PostgreSQL target: {DB_HOST}:{DB_PORT}/{DB_NAME}")
 
     while True:
         device, cpu, ram, disk = collect_metrics()

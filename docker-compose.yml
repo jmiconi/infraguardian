@@ -1,47 +1,63 @@
 services:
 
+  # PostgreSQL database service
+  # Stores all collected metrics from InfraGuardian collectors
   postgres:
     image: postgres:16
     container_name: ig-postgres
     restart: always
 
     environment:
+      # Database configuration loaded from .env
       POSTGRES_DB: ${POSTGRES_DB}
       POSTGRES_USER: ${POSTGRES_USER}
       POSTGRES_PASSWORD: ${POSTGRES_PASSWORD}
+
+      # Container timezone
       TZ: America/Argentina/Buenos_Aires
 
     volumes:
+      # Persistent database storage
       - ./db/data:/var/lib/postgresql/data
+
+      # Initialization scripts executed only on first DB creation
       - ./db/init:/docker-entrypoint-initdb.d
 
     ports:
+      # Expose PostgreSQL to host for debugging or external access
       - "5432:5432"
 
     networks:
       - infraguardian
 
     healthcheck:
+      # Ensures PostgreSQL is ready before dependent services start
       test: ["CMD-SHELL", "pg_isready -h localhost -U ${POSTGRES_USER} -d ${POSTGRES_DB}"]
       interval: 10s
       timeout: 5s
       retries: 5
 
 
+  # InfraGuardian Collector
+  # Collects system metrics and sends them to PostgreSQL
   collector:
     build: ./collector
     container_name: ig-collector
     restart: always
 
     environment:
+      # Database connection configuration
       POSTGRES_HOST: ${POSTGRES_HOST}
       POSTGRES_PORT: ${POSTGRES_PORT}
       POSTGRES_DB: ${POSTGRES_DB}
       POSTGRES_USER: ${POSTGRES_USER}
       POSTGRES_PASSWORD: ${POSTGRES_PASSWORD}
+
+      # Metric collection interval (seconds)
       COLLECTOR_INTERVAL: ${COLLECTOR_INTERVAL}
 
     depends_on:
+      # Wait until PostgreSQL is healthy before starting
       postgres:
         condition: service_healthy
 
@@ -49,15 +65,19 @@ services:
       - infraguardian
 
 
+  # Grafana visualization service
+  # Provides dashboards for InfraGuardian metrics
   grafana:
     image: grafana/grafana
     container_name: ig-grafana
     restart: always
 
     ports:
+      # Grafana web interface
       - "3000:3000"
 
     environment:
+      # PostgreSQL datasource configuration
       POSTGRES_HOST: ig-postgres
       POSTGRES_PORT: "5432"
       POSTGRES_DB: ${POSTGRES_DB}
@@ -65,8 +85,13 @@ services:
       POSTGRES_PASSWORD: ${POSTGRES_PASSWORD}
 
     volumes:
+      # Persistent Grafana storage
       - grafana_data:/var/lib/grafana
+
+      # Provisioning configuration (datasources, dashboards)
       - ./grafana/provisioning:/etc/grafana/provisioning
+
+      # Predefined dashboards
       - ./grafana/dashboards:/var/lib/grafana/dashboards
 
     depends_on:
@@ -77,9 +102,12 @@ services:
       - infraguardian
 
 
+# Internal Docker network for all InfraGuardian services
 networks:
   infraguardian:
     driver: bridge
 
+
+# Named volumes managed by Docker
 volumes:
   grafana_data:

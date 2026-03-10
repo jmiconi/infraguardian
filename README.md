@@ -1,153 +1,89 @@
-# InfraGuardian
+===============================================================================
+  PROJECT: InfraGuardian
+  MAINTAINER: jmiconi
+  ROLE: Lightweight Infrastructure Observability Stack
+  VERSION: 0.1.0-beta
+  STATUS: Development / MVP
+===============================================================================
 
-InfraGuardian is a lightweight infrastructure observability stack built with:
+## 1. EXECUTIVE SUMMARY
+InfraGuardian is an opinionated observability solution designed for automated 
+system metrics monitoring. It leverages a decoupled architecture to ensure 
+that data collection, persistence, and visualization layers scale independently 
+following SRE best practices.
 
-- Docker
-- PostgreSQL
-- Python
-- Grafana
+## 2. TECHNICAL STACK (CORE COMPONENTS)
+* COLLECTOR: Python 3.11 (Asynchronous ingestion engine).
+* STORAGE: PostgreSQL 15 (Relational backend for time-series data).
+* VISUALIZATION: Grafana 10.x (Automated Dashboard-as-Code provisioning).
+* ORCHESTRATION: Docker Compose (Immutable infrastructure manifest).
 
-It collects basic system metrics from a host, stores them in PostgreSQL, and visualizes them in Grafana.
+## 3. REPOSITORY STRUCTURE
+The project follows a "Separation of Concerns" (SoC) directory pattern:
 
-## Features
+.
+├── collector/          # Ingestion logic & Python SDK
+├── db/                 # SQL DDL & persistence layer
+│   └── init/           # Auto-initialization scripts (Schema Seeders)
+├── grafana/            # Observability config (Provisioning & Dashboards)
+│   ├── dashboards/     # JSON Dashboard definitions
+│   └── provisioning/   # Automated Datasource/Provider configs
+├── setup.sh            # Environment bootstrap script
+├── .env.example        # Environment configuration template
+└── docker-compose.yml  # Multi-container orchestration manifest
 
-- CPU usage collection
-- RAM usage collection
-- Disk usage collection
-- PostgreSQL as metrics storage
-- Grafana datasource provisioning
-- Docker Compose deployment
-- Environment-based configuration
+## 4. DEPLOYMENT & INSTALLATION
 
-## Architecture
+### 4.1. First-Time Setup (Bootstrap)
+We provide a bootstrap script to automate environment validation, dependency 
+checks, and initial configuration:
 
-InfraGuardian currently includes three main components:
+# Clone the asset
+$ git clone https://github.com/jmiconi/infraguardian.git
+$ cd infraguardian
 
-- **collector**  
-  A Python-based collector that gathers system metrics.
+# Run the bootstrap script
+$ chmod +x setup.sh
+$ ./setup.sh
 
-- **postgres**  
-  A PostgreSQL database used to store collected metrics.
+### 4.2. Manual Quickstart
+If you prefer manual orchestration, execute the following:
 
-- **grafana**  
-  A Grafana instance used to query and visualize metrics.
+# Initialize environment variables
+$ cp .env.example .env
 
-## Collected metrics
+# Provision the full stack (Detached Mode)
+$ docker compose up -d --build
 
-The collector currently stores the following metrics:
+## 5. SCHEMA DEFINITION (TIME-SERIES)
+The `metrics` table is indexed and optimized for time-based aggregation queries:
 
-- `cpu_usage`
-- `ram_usage`
-- `disk_usage`
+| Column     | Data Type    | Description                              |
+|------------|--------------|------------------------------------------|
+| id         | UUID/PK      | Unique entry identifier                  |
+| timestamp  | TIMESTAMPTZ  | Event capture time (UTC)                 |
+| device     | VARCHAR      | Origin hostname or instance ID           |
+| sensor     | VARCHAR      | Metric type (cpu, ram, disk)             |
+| value      | FLOAT        | Recorded numerical value                 |
+| status     | ENUM         | Health state (ok, warning, critical)     |
 
-## Project structure
+## 6. ACCESS & DEFAULT CREDENTIALS
+* GRAFANA UI: http://localhost:3000 (User: admin / Pass: admin)
+* POSTGRES: localhost:5432 (Local port-forwarding enabled)
 
-```text
-collector/
-  collector.py
-  Dockerfile
-  requirements.txt
+## 7. OBSERVED TELEMETRY
+The 'Collector' agent currently monitors:
+- CPU Utilization: Percentage load per core.
+- RAM Usage: Available vs. Committed memory.
+- Disk I/O: Capacity and mount point utilization.
 
-db/
-  init/
-    01-init.sql
-  data/
+## 8. ENGINEERING ROADMAP
+[ ] Migration to TimescaleDB for hyper-table optimizations.
+[ ] Multi-host agent support (Remote Linux/Windows exporters).
+[ ] Webhook-based Alerting (Slack/PagerDuty) based on status thresholds.
+[ ] OpenTelemetry (OTel) exporter compatibility.
 
-grafana/
-  dashboards/
-    system_metrics.json
-  provisioning/
-    dashboards/
-    datasources/
-  data/
-
-docker-compose.yml
-.env.example
-README.md
-
-
-
-
-Requirements
-
-Docker
-
-Docker Compose
-
-Quick start
-
-Clone the repository:
-
-git clone https://github.com/YOUR_USERNAME/infraguardian.git
-cd infraguardian
-
-Create your environment file:
-
-cp .env.example .env
-
-Start the stack:
-
-docker compose up -d --build
-Services
-
-Grafana: http://localhost:3000
-
-PostgreSQL: localhost:5432
-
-Default Grafana credentials
-
-Username: admin
-
-Password: admin
-
-Database schema
-
-The main table is:
-
-metrics
-
-Columns:
-
-id
-
-timestamp
-
-device
-
-sensor
-
-value
-
-status
-
-Current status
-
-InfraGuardian v0.0.1 provides a functional local observability base with:
-
-Docker Compose orchestration
-
-PostgreSQL metrics ingestion
-
-Python collector
-
-Grafana provisioning
-
-Environment variable support for configuration
-
-Roadmap
-
-Multi-host support
-
-Linux agents
-
-Windows agents
-
-Dynamic dashboards
-
-Event correlation
-
-AI-assisted observability features
-
-License
-
-MIT
+---
+Maintained by jmiconi
+"In code we trust, in metrics we verify."
+===============================================================================

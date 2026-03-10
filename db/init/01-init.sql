@@ -1,6 +1,9 @@
--- InfraGuardian DB initialization
--- Este script se ejecuta automáticamente
--- cuando PostgreSQL crea la base por primera vez
+-- InfraGuardian database initialization
+-- This script runs automatically when PostgreSQL
+-- initializes the database for the first time.
+
+-- The metrics table stores all collected telemetry.
+-- Each row represents a single metric sample from a device.
 
 CREATE TABLE metrics (
 
