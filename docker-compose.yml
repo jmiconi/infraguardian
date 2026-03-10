@@ -14,6 +14,7 @@ services:
     volumes:
       - ./db/data:/var/lib/postgresql/data
       - ./db/init:/docker-entrypoint-initdb.d
+
     ports:
       - "5432:5432"
 
@@ -39,11 +40,11 @@ services:
       POSTGRES_USER: ${POSTGRES_USER}
       POSTGRES_PASSWORD: ${POSTGRES_PASSWORD}
       COLLECTOR_INTERVAL: ${COLLECTOR_INTERVAL}
-  
+
     depends_on:
       postgres:
         condition: service_healthy
-  
+
     networks:
       - infraguardian
 
@@ -64,10 +65,10 @@ services:
       POSTGRES_PASSWORD: ${POSTGRES_PASSWORD}
 
     volumes:
-      - ./grafana/data:/var/lib/grafana
+      - grafana_data:/var/lib/grafana
       - ./grafana/provisioning:/etc/grafana/provisioning
       - ./grafana/dashboards:/var/lib/grafana/dashboards
-  
+
     depends_on:
       postgres:
         condition: service_healthy
@@ -79,3 +80,6 @@ services:
 networks:
   infraguardian:
     driver: bridge
+
+volumes:
+  grafana_data:
