@@ -38,34 +38,47 @@ services:
       retries: 5
 
 
+
+#-------------------------------------------------------------
+#-------------------------------------------------------------
+#-------------------------------------------------------------
+# Collector moved to host-based execution using Python venv.
+# See /collector/collector.py and systemd service.
+#-------------------------------------------------------------
+#-------------------------------------------------------------
+#-------------------------------------------------------------
+
+
   # InfraGuardian Collector
   # Collects system metrics and sends them to PostgreSQL
-  collector:
-    build: ./collector
-    container_name: ig-collector
-    restart: always
+  # collector:
+  #   build: ./collector
+  #   container_name: ig-collector
+  #   restart: always
 
-    environment:
-      # Database connection configuration
-      POSTGRES_HOST: ${POSTGRES_HOST}
-      POSTGRES_PORT: ${POSTGRES_PORT}
-      POSTGRES_DB: ${POSTGRES_DB}
-      POSTGRES_USER: ${POSTGRES_USER}
-      POSTGRES_PASSWORD: ${POSTGRES_PASSWORD}
+  #   environment:
+  #     # Database connection configuration
+  #     POSTGRES_HOST: ${POSTGRES_HOST}
+  #     POSTGRES_PORT: ${POSTGRES_PORT}
+  #     POSTGRES_DB: ${POSTGRES_DB}
+  #     POSTGRES_USER: ${POSTGRES_USER}
+  #     POSTGRES_PASSWORD: ${POSTGRES_PASSWORD}
+  #     HOST_ROLE: ${HOST_ROLE}
+  #     ENVIRONMENT: ${ENVIRONMENT}
 
-      # Metric collection interval (seconds)
-      COLLECTOR_INTERVAL: ${COLLECTOR_INTERVAL}
+  #     # Metric collection interval (seconds)
+  #     COLLECTOR_INTERVAL: ${COLLECTOR_INTERVAL}
 
-    volumes:
-      - /etc/localtime:/etc/localtime:ro
-      - /etc/timezone:/etc/timezone:ro
-    depends_on:
-      # Wait until PostgreSQL is healthy before starting
-      postgres:
-        condition: service_healthy
+  #   volumes:
+  #     - /etc/localtime:/etc/localtime:ro
+  #     - /etc/timezone:/etc/timezone:ro
+  #   depends_on:
+  #     # Wait until PostgreSQL is healthy before starting
+  #     postgres:
+  #       condition: service_healthy
 
-    networks:
-      - infraguardian
+  #   networks:
+  #     - infraguardian
 
 
   # Grafana visualization service

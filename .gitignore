@@ -1,5 +1,7 @@
 # Environment variables
 .env
+collector/config.env
+venv/
 
 # Python
 __pycache__/
