@@ -108,7 +108,7 @@ services:
       - ./grafana/provisioning:/etc/grafana/provisioning
 
       # Predefined dashboards
-      - ./grafana/dashboards:/var/lib/grafana/dashboards
+      - ./grafana/dashboards:/etc/grafana/dashboards
 
       - /etc/localtime:/etc/localtime:ro
       - /etc/timezone:/etc/timezone:ro
