@@ -12,18 +12,23 @@ COLLECTOR_DIR="$INSTALL_DIR/collector"
 VENV_DIR="$INSTALL_DIR/venv"
 SERVICE_NAME="infraguardian-collector.service"
 
-echo "Creating directories..."
-sudo mkdir -p "$COLLECTOR_DIR"
+echo "Repository directory detected as: $REPO_DIR"
+echo "Target installation directory: $INSTALL_DIR"
 
-echo "Copying collector files..."
-sudo cp "$REPO_DIR/collector/collector.py" "$COLLECTOR_DIR/"
-sudo cp "$REPO_DIR/collector/requirements.txt" "$COLLECTOR_DIR/"
+if [ "$REPO_DIR" != "$INSTALL_DIR" ]; then
+    echo "Repository is outside target path. Copying collector files..."
+    sudo mkdir -p "$COLLECTOR_DIR"
+    sudo cp "$REPO_DIR/collector/collector.py" "$COLLECTOR_DIR/"
+    sudo cp "$REPO_DIR/collector/requirements.txt" "$COLLECTOR_DIR/"
 
-if [ ! -f "$COLLECTOR_DIR/config.env" ]; then
-    echo "Creating default config.env..."
-    sudo cp "$REPO_DIR/collector/config.env" "$COLLECTOR_DIR/"
+    if [ ! -f "$COLLECTOR_DIR/config.env" ]; then
+        echo "Creating default config.env..."
+        sudo cp "$REPO_DIR/collector/config.env" "$COLLECTOR_DIR/"
+    else
+        echo "config.env already exists, keeping current file."
+    fi
 else
-    echo "config.env already exists, keeping current file."
+    echo "Repository is already in $INSTALL_DIR. Skipping file copy step."
 fi
 
 echo "Creating Python virtual environment..."
