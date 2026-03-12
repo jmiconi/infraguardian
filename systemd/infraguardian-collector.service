@@ -1,0 +1,15 @@
+[Unit]
+Description=InfraGuardian Metrics Collector
+After=network.target
+
+[Service]
+Type=simple
+User=root
+WorkingDirectory=/opt/infraguardian/collector
+EnvironmentFile=/opt/infraguardian/collector/config.env
+ExecStart=/opt/infraguardian/venv/bin/python -u /opt/infraguardian/collector/collector.py
+Restart=always
+RestartSec=5
+
+[Install]
+WantedBy=multi-user.target
