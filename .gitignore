@@ -20,3 +20,9 @@ grafana/data/
 # Editor files
 .vscode
 .idea
+
+# Local environment configuration
+collector/config.env
+windows/collector/config.env
+
+
