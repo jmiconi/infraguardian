@@ -9,8 +9,9 @@
 # - Creates C:\InfraGuardian\collector
 # - Copies collector files
 # - Validates psql path from config.env
+# - Auto-detects psql.exe if configured path is invalid
 # - Executes a test run
-# - Creates or replaces a Scheduled Task
+# - Creates or replaces a Scheduled Task using schtasks.exe
 # - Starts the task
 # =========================================
 
@@ -23,11 +24,36 @@ $ErrorActionPreference = "Stop"
 $InstallRoot = "C:\InfraGuardian"
 $InstallCollectorDir = Join-Path $InstallRoot "collector"
 $TaskName = "InfraGuardian Collector"
+$PowerShellExe = Join-Path $env:WINDIR "System32\WindowsPowerShell\v1.0\powershell.exe"
 
 # By default, source files are expected to be
 # in .\collector next to this installer script.
 $ScriptDir = Split-Path -Parent $MyInvocation.MyCommand.Path
 $SourceCollectorDir = Join-Path $ScriptDir "collector"
+
+# -----------------------------------------
+# FUNCTION: Run native command safely
+# -----------------------------------------
+function Invoke-NativeCommand {
+    param (
+        [Parameter(Mandatory = $true)]
+        [string]$FilePath,
+
+        [Parameter(Mandatory = $false)]
+        [string[]]$Arguments = @(),
+
+        [switch]$IgnoreExitCode
+    )
+
+    & $FilePath @Arguments
+    $exitCode = $LASTEXITCODE
+
+    if (-not $IgnoreExitCode -and $exitCode -ne 0) {
+        throw "Command failed with exit code ${exitCode}: $FilePath $($Arguments -join ' ')"
+    }
+
+    return $exitCode
+}
 
 # -----------------------------------------
 # FUNCTION: Read simple KEY=VALUE env file
@@ -106,7 +132,14 @@ function Copy-CollectorFiles {
 # -----------------------------------------
 # FUNCTION: Validate installed files
 # -----------------------------------------
+# Behavior:
+# 1. Check collector.ps1 and config.env exist
+# 2. Read PSQL_PATH from config.env if present
+# 3. If configured path is invalid, auto-detect psql.exe
+# 4. If auto-detected, update config.env automatically
+# -----------------------------------------
 function Test-InstalledFiles {
+
     $installedCollector = Join-Path $InstallCollectorDir "collector.ps1"
     $installedConfig = Join-Path $InstallCollectorDir "config.env"
 
@@ -119,18 +152,59 @@ function Test-InstalledFiles {
     }
 
     $config = Import-EnvFile -Path $installedConfig
+    $psqlPath = $null
 
-    if (-not $config.ContainsKey("PSQL_PATH")) {
-        throw "PSQL_PATH not found in config.env"
+    if ($config.ContainsKey("PSQL_PATH")) {
+        $psqlPath = $config["PSQL_PATH"]
+    }
+    else {
+        Write-Host "PSQL_PATH not defined in config.env. Attempting auto-detection..."
     }
 
-    $psqlPath = $config["PSQL_PATH"]
-
-    if (-not (Test-Path $psqlPath)) {
-        throw "psql.exe not found at configured path: $psqlPath"
+    if (-not [string]::IsNullOrWhiteSpace($psqlPath) -and (Test-Path $psqlPath)) {
+        Write-Host "Found psql.exe at configured path: $psqlPath"
+        Write-Host "Validated installed files successfully."
+        return
     }
 
-    Write-Host "Validated installed files successfully."
+    Write-Host "Configured psql path not valid. Searching automatically..."
+
+    $searchRoot = "C:\Program Files\PostgreSQL"
+
+    if (Test-Path $searchRoot) {
+        $found = Get-ChildItem -Path $searchRoot -Recurse -Filter "psql.exe" -ErrorAction SilentlyContinue |
+            Sort-Object FullName -Descending |
+            Select-Object -First 1
+
+        if ($found) {
+            Write-Host "Auto-detected psql.exe at: $($found.FullName)"
+
+            $configContent = Get-Content $installedConfig
+            $hasPsqlLine = $false
+
+            $updatedContent = foreach ($line in $configContent) {
+                if ($line -match "^PSQL_PATH=") {
+                    $hasPsqlLine = $true
+                    "PSQL_PATH=$($found.FullName)"
+                }
+                else {
+                    $line
+                }
+            }
+
+            if (-not $hasPsqlLine) {
+                $updatedContent += "PSQL_PATH=$($found.FullName)"
+            }
+
+            Set-Content -Path $installedConfig -Value $updatedContent
+
+            Write-Host "config.env updated with detected psql path."
+            Write-Host "Validated installed files successfully."
+            return
+        }
+    }
+
+    throw "psql.exe not found. Please install PostgreSQL client tools."
 }
 
 # -----------------------------------------
@@ -140,11 +214,11 @@ function Test-CollectorExecution {
     $installedCollector = Join-Path $InstallCollectorDir "collector.ps1"
 
     Write-Host "Running collector test..."
-    & powershell.exe -ExecutionPolicy Bypass -File $installedCollector
-
-    if ($LASTEXITCODE -ne 0) {
-        throw "Collector test failed with exit code $LASTEXITCODE"
-    }
+    Invoke-NativeCommand -FilePath $PowerShellExe -Arguments @(
+        "-NoProfile",
+        "-ExecutionPolicy", "Bypass",
+        "-File", $installedCollector
+    )
 
     Write-Host "Collector test completed successfully."
 }
@@ -153,11 +227,18 @@ function Test-CollectorExecution {
 # FUNCTION: Remove existing scheduled task
 # -----------------------------------------
 function Remove-ExistingTaskIfPresent {
-    $existingTask = Get-ScheduledTask -TaskName $TaskName -ErrorAction SilentlyContinue
+    $queryExit = Invoke-NativeCommand -FilePath "schtasks.exe" -Arguments @(
+        "/Query",
+        "/TN", $TaskName
+    ) -IgnoreExitCode
 
-    if ($null -ne $existingTask) {
+    if ($queryExit -eq 0) {
         Write-Host "Existing scheduled task found. Replacing it..."
-        Unregister-ScheduledTask -TaskName $TaskName -Confirm:$false
+        Invoke-NativeCommand -FilePath "schtasks.exe" -Arguments @(
+            "/Delete",
+            "/TN", $TaskName,
+            "/F"
+        )
     }
 }
 
@@ -167,34 +248,24 @@ function Remove-ExistingTaskIfPresent {
 function Register-CollectorTask {
     $collectorPath = Join-Path $InstallCollectorDir "collector.ps1"
 
+    if (-not (Test-Path $PowerShellExe)) {
+        throw "powershell.exe not found at expected path: $PowerShellExe"
+    }
+
+    $taskCommand = "`"$PowerShellExe`" -NoProfile -ExecutionPolicy Bypass -File `"$collectorPath`""
+
     Write-Host "Registering scheduled task..."
+    Write-Host "Task command: $taskCommand"
 
-    $action = New-ScheduledTaskAction `
-        -Execute "powershell.exe" `
-        -Argument "-NoProfile -ExecutionPolicy Bypass -File `"$collectorPath`""
-
-    $trigger = New-ScheduledTaskTrigger -Once -At (Get-Date).AddMinutes(1)
-    $trigger.RepetitionInterval = (New-TimeSpan -Minutes 1)
-    $trigger.RepetitionDuration = [TimeSpan]::MaxValue
-
-    $principal = New-ScheduledTaskPrincipal `
-        -UserId "SYSTEM" `
-        -LogonType ServiceAccount `
-        -RunLevel Highest
-
-    $settings = New-ScheduledTaskSettingsSet `
-        -AllowStartIfOnBatteries `
-        -DontStopIfGoingOnBatteries `
-        -StartWhenAvailable `
-        -MultipleInstances IgnoreNew
-
-    Register-ScheduledTask `
-        -TaskName $TaskName `
-        -Action $action `
-        -Trigger $trigger `
-        -Principal $principal `
-        -Settings $settings `
-        -Description "InfraGuardian Windows metrics collector"
+    Invoke-NativeCommand -FilePath "schtasks.exe" -Arguments @(
+        "/Create",
+        "/TN", $TaskName,
+        "/SC", "MINUTE",
+        "/MO", "1",
+        "/RU", "SYSTEM",
+        "/TR", $taskCommand,
+        "/F"
+    )
 
     Write-Host "Scheduled task registered successfully."
 }
@@ -204,7 +275,12 @@ function Register-CollectorTask {
 # -----------------------------------------
 function Start-CollectorTask {
     Write-Host "Starting scheduled task..."
-    Start-ScheduledTask -TaskName $TaskName
+
+    Invoke-NativeCommand -FilePath "schtasks.exe" -Arguments @(
+        "/Run",
+        "/TN", $TaskName
+    )
+
     Write-Host "Scheduled task started."
 }
 
@@ -218,6 +294,7 @@ try {
     Write-Host "Source path      : $SourceCollectorDir"
     Write-Host "Install path     : $InstallCollectorDir"
     Write-Host "Task name        : $TaskName"
+    Write-Host "PowerShell path  : $PowerShellExe"
     Write-Host ""
 
     if (-not (Test-IsAdministrator)) {
