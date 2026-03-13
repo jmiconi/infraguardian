@@ -24,6 +24,6 @@ grafana/data/
 # Local environment configuration
 collector/config.env
 windows/collector/config.env
-
 windows/v2-python/config.env
+
 

@@ -1,372 +1,132 @@
-# InfraGuardian -- DevOps Observability Platform
+# InfraGuardian
 
-![Platform](https://img.shields.io/badge/platform-linux%20%7C%20windows-blue)
-![Stack](https://img.shields.io/badge/stack-docker%20%7C%20postgres%20%7C%20grafana-orange)
-![Collectors](https://img.shields.io/badge/collectors-python%20%7C%20powershell-green)
-![Status](https://img.shields.io/badge/status-active%20development-yellow)
+InfraGuardian es una plataforma de **observabilidad para infraestructura
+on‑premise** diseñada como proyecto de aprendizaje DevOps/SRE y como
+base para un sistema real de monitoreo.
 
-InfraGuardian is a lightweight **observability platform for on‑prem
-infrastructure** built with a **DevOps / SRE mindset**.
+El objetivo es construir una solución simple, portable y extensible que
+permita:
 
-It provides:
-
-• Centralized infrastructure metrics\
-• Cross‑platform collectors (Linux + Windows)\
-• Historical metrics storage\
-• Grafana dashboards\
-• A foundation for **future AI‑assisted infrastructure analysis**
-
-InfraGuardian began as a DevOps learning lab and is evolving into a
-**practical observability platform for real on‑prem environments**.
+-   Monitorear múltiples hosts
+-   Analizar métricas históricas
+-   Detectar saturación de recursos
+-   Servir como base para análisis con IA
 
 ------------------------------------------------------------------------
 
-# Architecture
+## Stack
 
-InfraGuardian uses a **centralized metrics ingestion model**.
-
-Linux hosts run a **Python collector**, while Windows hosts run a
-**PowerShell collector**.
-
-Both send metrics to a **central PostgreSQL database**, which feeds
-**Grafana dashboards**.
-
-    Linux Host
-       ↓
-    Python Collector
-       ↓
-    PostgreSQL
-       ↓
-    Grafana Dashboards
-
-    Windows Host
-       ↓
-    PowerShell Collector
-       ↓
-    PostgreSQL
-       ↓
-    Grafana Dashboards
-
-Benefits of this architecture:
-
-• Multi‑host observability\
-• Centralized metrics storage\
-• Historical analysis\
-• Unified dashboards
+-   Docker
+-   Docker Compose
+-   PostgreSQL
+-   Grafana
+-   Python
+-   Bash
+-   Windows PowerShell (para deploy en Windows)
 
 ------------------------------------------------------------------------
 
-# Technology Stack
+## Arquitectura
 
-InfraGuardian intentionally uses **simple, robust technologies**.
+InfraGuardian sigue un modelo simple de **collector → base de datos →
+visualización**.
 
-  Component            Technology
-  -------------------- --------------------------------------
-  Collectors           Python (Linux), PowerShell (Windows)
-  Database             PostgreSQL
-  Visualization        Grafana
-  Infrastructure       Docker
-  Service Management   systemd
-  Windows Scheduling   Task Scheduler
-  Version Control      Git / GitHub
+Host Metrics\
+↓\
+Python Collector\
+↓\
+PostgreSQL\
+↓\
+Grafana Dashboards
 
-This design keeps the platform:
+Los collectors se ejecutan en cada host y envían métricas periódicamente
+a PostgreSQL.
 
-• simple to deploy\
-• easy to debug\
-• easy to extend
+Grafana consulta PostgreSQL para generar dashboards.
 
 ------------------------------------------------------------------------
 
-# Collected Metrics
+## Estructura del repositorio
 
-InfraGuardian currently collects:
-
-  Metric            Description
-  ----------------- -------------------------------
-  CPU usage         CPU utilization percentage
-  RAM usage         Memory utilization percentage
-  Disk usage        Disk utilization percentage
-  Process count     Number of running processes
-  Network traffic   Bytes sent / received
-  Load average      Linux system load averages
-
-## Linux Specific Metrics
-
-Linux collectors expose:
-
-    load_1
-    load_5
-    load_15
-
-## Windows Behavior
-
-Windows does not expose load average, therefore these values are stored
-as:
-
-    NULL
+    infraguardian
+    │
+    ├ collector
+    │   ├ collector.py
+    │   ├ requirements.txt
+    │   └ config.env.example
+    │
+    ├ windows
+    │   └ v2-python
+    │       ├ collector.py
+    │       ├ requirements.txt
+    │       ├ config.env.example
+    │       └ install_collector.ps1
+    │
+    ├ db
+    │   └ init
+    │
+    ├ grafana
+    │   ├ dashboards
+    │   └ provisioning
+    │
+    ├ docker-compose.yml
+    └ README.md
 
 ------------------------------------------------------------------------
 
-# Repository Structure
+## Deploy rápido
 
-    /opt/infraguardian
-
-    collector/
-        collector.py
-        requirements.txt
-        config.env
-
-    windows/
-        collector/
-            collector.ps1
-            config.env
-        install_collector.ps1
-
-    scripts/
-        install_collector.sh
-
-    systemd/
-        infraguardian-collector.service
-
-    grafana/
-        dashboards/
-        provisioning/
-
-    db/init/
-        002_system_metrics.sql
-
-    docker-compose.yml
-
-------------------------------------------------------------------------
-
-# Quick Start
-
-Clone the repository:
+### 1 Clonar repositorio
 
     git clone https://github.com/jmiconi/infraguardian.git
     cd infraguardian
 
-------------------------------------------------------------------------
+### 2 Configurar variables
 
-# Linux Installation
+    cp collector/config.env.example collector/config.env
 
-Run the installer:
-
-    ./scripts/install_collector.sh
-
-The installer will:
-
-• create Python virtual environment\
-• install dependencies\
-• configure the collector\
-• register systemd service\
-• start the collector automatically
-
-Default collection interval:
-
-    30 seconds
+Editar con tus valores.
 
 ------------------------------------------------------------------------
 
-# Windows Collector
+### 3 Levantar stack
 
-The Windows collector is implemented in **PowerShell**.
-
-It gathers system metrics and inserts them into PostgreSQL using the
-**psql command‑line client**.
+    docker compose up -d
 
 ------------------------------------------------------------------------
 
-# Windows Requirements
+### 4 Acceder a Grafana
 
-Before installing the collector you must install:
-
-## PostgreSQL Client Tools
-
-Download from:
-
-https://www.postgresql.org/download/windows/
-
-During installation ensure the following component is selected:
-
-    Command Line Tools
-
-Typical installation path:
-
-    C:\Program Files\PostgreSQL\<version>\bin\psql.exe
-
-The InfraGuardian installer attempts to **automatically detect this
-path**.
+    http://localhost:3000
 
 ------------------------------------------------------------------------
 
-# Windows Installation
+## Objetivos del proyecto
 
-Run the installer:
+InfraGuardian busca evolucionar hacia:
 
-    powershell -ExecutionPolicy Bypass -File install_collector.ps1
-
-The installer performs:
-
-• installation directory creation\
-• collector file deployment\
-• PostgreSQL client detection\
-• collector test execution\
-• scheduled task creation\
-• automatic collector startup
+-   monitoreo multi‑host
+-   análisis histórico de infraestructura
+-   detección automática de anomalías
+-   predicción de saturación mediante IA
 
 ------------------------------------------------------------------------
 
-# Windows Collector Schedule
+## Estado actual
 
-Collectors run via **Windows Task Scheduler**.
+Versión estable:
 
-Default schedule:
+    v0.x – Observabilidad básica
 
-    Every 1 minute
+Incluye:
 
-------------------------------------------------------------------------
-
-# Verifying Installation
-
-Verify scheduled task:
-
-    schtasks /Query /TN "InfraGuardian Collector" /V /FO LIST
-
-Expected result:
-
-    Last Result: 0
+-   collector Linux
+-   collector Windows
+-   PostgreSQL
+-   Grafana dashboards
 
 ------------------------------------------------------------------------
 
-# Verifying Metrics
+## Autor
 
-Confirm data ingestion in PostgreSQL:
-
-    SELECT hostname, collected_at
-    FROM system_metrics
-    ORDER BY collected_at DESC
-    LIMIT 10;
-
-------------------------------------------------------------------------
-
-# Grafana Dashboards
-
-Grafana dashboards are **automatically provisioned**.
-
-Current dashboards include:
-
-• CPU usage\
-• RAM utilization\
-• Disk utilization\
-• Network traffic\
-• System load
-
-------------------------------------------------------------------------
-
-# Security
-
-Configuration files containing credentials:
-
-    config.env
-
-must **never be committed to Git**.
-
-Instead use:
-
-    config.env.example
-
-and ignore local configuration using:
-
-    .gitignore
-
-------------------------------------------------------------------------
-
-# Troubleshooting
-
-## Collector not inserting metrics
-
-Verify PostgreSQL client installation:
-
-    where psql
-
-or check typical location:
-
-    C:\Program Files\PostgreSQL\<version>\bin\psql.exe
-
-------------------------------------------------------------------------
-
-## Check scheduled task
-
-    schtasks /Query /TN "InfraGuardian Collector" /V /FO LIST
-
-------------------------------------------------------------------------
-
-## Run collector manually
-
-    powershell -ExecutionPolicy Bypass -File C:\InfraGuardian\collector\collector.ps1
-
-------------------------------------------------------------------------
-
-# Roadmap
-
-InfraGuardian is designed to evolve into a **full observability
-platform**.
-
-## Device Inventory
-
-Future table:
-
-    devices
-
-Allowing:
-
-• host metadata\
-• environment grouping\
-• infrastructure roles
-
-------------------------------------------------------------------------
-
-## Disk Observability
-
-Filesystem level metrics:
-
-• mountpoints\
-• disk capacity\
-• saturation trends
-
-------------------------------------------------------------------------
-
-## Network Observability
-
-Derived metrics:
-
-• Mbps throughput\
-• network saturation
-
-------------------------------------------------------------------------
-
-## Predictive Infrastructure Analytics
-
-Long‑term objective:
-
-Apply **AI models** to infrastructure metrics to detect:
-
-• abnormal resource behavior\
-• capacity risks\
-• infrastructure growth trends
-
-------------------------------------------------------------------------
-
-# Project Status
-
-InfraGuardian is currently in **active development**.
-
-Current capabilities:
-
-✔ Linux collector\
-✔ Windows collector\
-✔ PostgreSQL ingestion\
-✔ Grafana dashboards\
-✔ Automated installers
+Proyecto desarrollado por **InfraGuardian**
