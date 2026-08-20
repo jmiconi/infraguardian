@@ -1,80 +1,154 @@
 # InfraGuardian Architecture
 
-InfraGuardian utiliza una arquitectura simple orientada a
-observabilidad.
+InfraGuardian separates **collection**, **persistence** and **visualization** so each layer can be operated and evolved independently.
 
-## Componentes principales
+## High-level design
 
-### Collector
+```text
+             Infrastructure hosts
+        ┌────────────┴────────────┐
+        │                         │
+        ▼                         ▼
+┌───────────────┐         ┌───────────────┐
+│ Linux hosts   │         │ Windows hosts │
+│ Python agent  │         │ PS/Python     │
+└───────┬───────┘         └───────┬───────┘
+        │                          │
+        └────────────┬─────────────┘
+                     │ metrics
+                     ▼
+              ┌─────────────┐
+              │ PostgreSQL  │
+              │ time-series │
+              │  history    │
+              └──────┬──────┘
+                     │ queries
+                     ▼
+              ┌─────────────┐
+              │   Grafana   │
+              │ dashboards  │
+              └─────────────┘
+```
 
-Script en Python que recolecta métricas del sistema:
+## 1. Collection layer
 
--   CPU
--   RAM
--   Disco
--   Procesos
--   Network
+Collectors run close to the operating system being observed.
 
-Utiliza la librería:
+Typical host metrics include:
 
-    psutil
+- CPU utilization
+- RAM utilization
+- filesystem/disk utilization
+- process count
+- network bytes sent and received
+- hostname / node identity
+- collection timestamp
 
-El collector envía métricas periódicamente a PostgreSQL.
+Python collectors use `psutil` for portable system instrumentation. Windows deployment material also uses PowerShell so installation and service management can be automated without requiring manual setup on each endpoint.
 
-------------------------------------------------------------------------
+### Design choice
 
-### PostgreSQL
+Collectors are intentionally lightweight. They gather data and publish it to the persistence layer rather than embedding visualization or analysis logic in the endpoint.
 
-Base de datos donde se almacenan las métricas históricas.
+This keeps agents easier to audit, troubleshoot and replace.
 
-Tabla principal:
+## 2. Persistence layer
 
-    system_metrics
+PostgreSQL stores historical observations.
 
-Campos principales:
+A typical metric record contains fields such as:
 
--   hostname
--   cpu_percent
--   ram_percent
--   disk_percent
--   process_count
--   network_bytes_sent
--   network_bytes_recv
+```text
+hostname
+cpu_percent
+ram_percent
+disk_percent
+process_count
+network_bytes_sent
+network_bytes_recv
+collected_at
+```
 
-------------------------------------------------------------------------
+Historical persistence enables questions that cannot be answered reliably from a current-state check alone, including:
 
-### Grafana
+- Is resource consumption trending upward?
+- When did degradation begin?
+- Is a problem isolated to one node?
+- Does saturation recur at a particular time?
 
-Grafana se conecta a PostgreSQL y genera dashboards para visualizar
-métricas.
+## 3. Visualization layer
 
-Paneles actuales:
+Grafana reads the PostgreSQL data source and provides operational dashboards.
 
--   CPU usage
--   RAM usage
--   Disk usage
--   Processes
--   Network traffic
+Representative panels include:
 
-------------------------------------------------------------------------
+- CPU utilization
+- memory utilization
+- disk utilization
+- process counts
+- network traffic
+- host-level comparisons
 
-## Flujo de datos
+Provisioning material lives in the repository so dashboards and data-source configuration can be treated as infrastructure assets rather than only UI state.
 
-    Host
-     ↓
-    Python Collector
-     ↓
-    PostgreSQL
-     ↓
-    Grafana
+## 4. Runtime and deployment
 
-------------------------------------------------------------------------
+Docker Compose provides the reproducible platform runtime for central components.
 
-## Diseño futuro
+Linux integration includes Bash/setup tooling and systemd material. Windows integration includes PowerShell-oriented deployment assets.
 
-InfraGuardian planea agregar:
+This allows the project to demonstrate both sides of an infrastructure environment:
 
--   soporte multi-host
--   análisis predictivo
--   alertas automáticas
--   motor de análisis con IA
+- centralized platform deployment
+- endpoint/host deployment and operation
+
+## 5. Configuration and secrets
+
+Configuration is externalized using environment/example files.
+
+The public repository must never contain:
+
+- real credentials
+- private keys
+- organization-specific internal DNS names
+- production IP addressing
+- proprietary configuration exports
+
+Example values exist only to document the required configuration contract.
+
+## 6. Failure domains
+
+The architecture keeps failures relatively easy to isolate:
+
+| Failure | Expected impact |
+|---|---|
+| Single collector stops | One host stops reporting; historical data remains available |
+| Grafana unavailable | Collection/storage can continue |
+| PostgreSQL unavailable | Collectors cannot persist new observations |
+| Individual host offline | Other hosts continue reporting |
+
+This separation is useful operationally because visualization availability is not the same thing as data collection availability.
+
+## 7. Evolution path
+
+The architecture is intentionally extensible. Natural additions include:
+
+```text
+Collectors
+   │
+   ▼
+Storage ─────► Alert evaluation
+   │               │
+   │               ▼
+   │          Notifications
+   │
+   ├──────────► Grafana
+   │
+   └──────────► Analysis layer
+                    │
+                    ├── anomaly detection
+                    ├── capacity forecasting
+                    └── AI-assisted diagnosis
+```
+
+Future integrations can therefore build on the historical data model without rewriting endpoint collection from scratch.
