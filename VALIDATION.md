@@ -85,6 +85,58 @@ The validation run also exposed documentation and packaging details that were co
 5. The Linux collector installation and systemd deployment needed to be part of the reproducible quick-start path, not just represented elsewhere in the repository.
 6. Reboot/persistence validation is now an explicit deployment test.
 
+## Validation run 2 — README revalidation
+
+**Date:** 2026-08-20  
+**Result:** PASS  
+**Method:** restore the clean Ubuntu snapshot and follow the published README procedure from scratch
+
+### Revalidation results
+
+| Test | Result |
+|---|---|
+| Clean snapshot contains no Docker installation | PASS |
+| Clean snapshot contains no InfraGuardian checkout | PASS |
+| Clone current `main` branch | PASS |
+| Bootstrap Docker using documented `setup.sh` procedure | PASS |
+| Docker and Compose work without `sudo` after reconnect | PASS |
+| Copy `.env.example` and render Compose configuration | PASS |
+| Start PostgreSQL and Grafana | PASS |
+| Database schema contains `metrics` and `system_metrics` | PASS |
+| Install collector dependencies using documented venv procedure | PASS |
+| `collector/config.env.example` works with lab defaults | PASS |
+| Manual collector writes metrics | PASS |
+| systemd collector writes metrics unattended | PASS |
+| Host reboot preserves database state | PASS |
+| Docker restarts automatically | PASS |
+| PostgreSQL recovers and becomes `healthy` | PASS |
+| Grafana recovers automatically | PASS |
+| Collector recovers automatically | PASS |
+| Metrics continue increasing after reboot | PASS |
+
+The post-reboot `system_metrics` row count increased from **7 to 9** without manual collector execution, confirming continued unattended collection after restart.
+
+### Readiness finding
+
+The second run identified an application-readiness race during both initial startup and reboot validation. `docker compose up -d` and an `Up` container state can occur before Grafana is ready to accept HTTP connections. An immediate request may therefore return a temporary connection reset even though the service is starting correctly.
+
+The README was updated to wait for Grafana's `/login` endpoint before treating HTTP validation as complete:
+
+```bash
+until curl -fsS -o /dev/null http://localhost:3000/login; do
+  echo "Waiting for Grafana..."
+  sleep 2
+done
+```
+
+The same readiness check is used after reboot. This removes timing assumptions from the documented validation path.
+
+## Current validation status
+
+**PASS — reproducible from a clean Ubuntu Server 24.04.4 LTS baseline.**
+
+Two clean-VM runs demonstrated the complete Linux path from bootstrap through persisted metrics and Grafana visualization, including automatic recovery after a host reboot.
+
 ## Security note
 
 The validation was performed as an isolated lab deployment. Example credentials are not production credentials. PostgreSQL TCP/5432 is published by the current Compose topology so host-based or remote collectors can connect; production deployments should restrict access with firewall rules or a narrower binding appropriate to the intended topology.
