@@ -236,17 +236,38 @@ A deployment should survive a host reboot without manual intervention.
 sudo reboot
 ```
 
-After reconnecting:
+After reconnecting, first verify that the services and containers returned:
 
 ```bash
 cd /opt/infraguardian
 systemctl status docker --no-pager
 systemctl status infraguardian-collector --no-pager
 docker compose ps
+```
+
+Immediately after boot PostgreSQL may still report `health: starting`, and Grafana may have its TCP port open before the HTTP application is ready. Wait for Grafana readiness before validating it:
+
+```bash
+until curl -fsS -o /dev/null http://localhost:3000/login; do
+  echo "Waiting for Grafana after reboot..."
+  sleep 2
+done
+
+echo "Grafana is ready after reboot"
 curl -I http://localhost:3000
 ```
 
-Then confirm that new rows continue to appear in `system_metrics`.
+Then verify that PostgreSQL is healthy and that new rows continue to appear:
+
+```bash
+docker compose ps
+
+docker exec -it ig-postgres \
+  psql -U igadmin -d infraguardian \
+  -c "SELECT COUNT(*) FROM system_metrics;"
+```
+
+Repeat the row count after at least one collection interval to confirm that the systemd collector resumed automatically.
 
 See [VALIDATION.md](VALIDATION.md) for the clean-VM validation record.
 
