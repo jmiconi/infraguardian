@@ -75,109 +75,174 @@ infraguardian/
 ├── setup.sh
 ├── ARCHITECTURE.md
 ├── COLLECTORS.md
-└── DEVOPS_WORKFLOW.md
+├── DEVOPS_WORKFLOW.md
+└── VALIDATION.md
 ```
 
-## Quick start
+## Quick start — Ubuntu Server 24.04 LTS
 
-### Prerequisites
+The sequence below is intended to be reproducible on a clean Ubuntu Server installation.
 
-Validated on **Ubuntu Server 24.04.4 LTS**.
-
-A fresh host needs only Git, curl and CA certificates before cloning the repository:
+### 1. Install base tools
 
 ```bash
 sudo apt update
+sudo apt -y upgrade
 sudo apt install -y git curl ca-certificates
 ```
 
-### 1. Clone
+### 2. Clone the repository
 
 ```bash
-sudo git clone https://github.com/jmiconi/infraguardian.git /opt/infraguardian
+cd /opt
+sudo git clone https://github.com/jmiconi/infraguardian.git
 sudo chown -R "$USER":"$USER" /opt/infraguardian
 cd /opt/infraguardian
 ```
 
-### 2. Bootstrap Docker
-
-The repository includes a bootstrap script that installs Docker when it is not already present and adds the current user to the `docker` group.
+### 3. Bootstrap Docker
 
 ```bash
 chmod +x setup.sh
 ./setup.sh
 ```
 
-If the script adds your account to the `docker` group, log out and log back in before continuing:
+If the script adds your account to the `docker` group, log out and reconnect before continuing.
+
+Validate:
 
 ```bash
-exit
-```
-
-After reconnecting, verify access:
-
-```bash
-groups
 docker --version
 docker compose version
 docker ps
 ```
 
-The `groups` output should include `docker` and `docker ps` should work without `sudo`.
-
-### 3. Review configuration
-
-Use the example environment file as a starting point and keep real credentials outside version control.
+### 4. Configure the platform
 
 ```bash
 cd /opt/infraguardian
 cp .env.example .env
-```
-
-Change the example PostgreSQL password before starting the stack.
-
-### 4. Validate Compose configuration
-
-```bash
 docker compose config
 ```
 
-This catches missing variables and Compose syntax problems before containers are started.
+The example credentials are lab defaults only. Replace them before exposing the platform beyond an isolated test environment.
 
-### 5. Start the platform
+### 5. Start PostgreSQL and Grafana
 
 ```bash
 docker compose up -d
+docker compose ps
 ```
 
-### 6. Validate containers
+Expected state:
+
+- `ig-postgres` becomes `healthy`
+- `ig-grafana` becomes `Up`
+- Grafana listens on TCP/3000
+
+Validate Grafana locally:
 
 ```bash
-docker compose ps
-docker compose logs --tail=100 postgres
-docker compose logs --tail=100 grafana
+curl -I http://localhost:3000
 ```
 
-Expected core services:
+A `302` redirect to `/login` confirms that Grafana is responding.
 
-- `ig-postgres` — healthy
-- `ig-grafana` — running
+Validate the database schema:
 
-Grafana is exposed on TCP port `3000` by the default Compose configuration.
+```bash
+docker exec -it ig-postgres \
+  psql -U igadmin -d infraguardian \
+  -c "\\dt"
+```
 
-## Validation status
+### 6. Install the Linux collector
 
-The deployment procedure is being tested from clean VM snapshots rather than only from an already-prepared development machine.
+```bash
+sudo apt install -y python3-venv python3-pip
 
-Current validated baseline:
+cd /opt/infraguardian
+python3 -m venv venv
+./venv/bin/pip install --upgrade pip
+./venv/bin/pip install -r collector/requirements.txt
+```
 
-- Ubuntu Server 24.04.4 LTS
-- Docker Engine 29.x installed successfully by `setup.sh`
-- Docker Compose plugin 5.x installed successfully by `setup.sh`
-- clean Git clone to `/opt/infraguardian`
-- Docker daemon enabled and started by the bootstrap process
+Create the collector configuration:
 
-Further validation covers PostgreSQL initialization, Grafana provisioning, collector execution, persistence and reboot behavior.
+```bash
+cp collector/config.env.example collector/config.env
+```
+
+For the default single-host lab deployment, the collector can connect to PostgreSQL through `127.0.0.1:5432`.
+
+Review `collector/config.env` and make sure its PostgreSQL credentials match `.env`.
+
+### 7. Test the collector manually
+
+```bash
+cd /opt/infraguardian
+set -a
+source collector/config.env
+set +a
+./venv/bin/python -u collector/collector.py
+```
+
+After a few collection cycles, stop it with `Ctrl+C` and verify stored data:
+
+```bash
+docker exec -it ig-postgres \
+  psql -U igadmin -d infraguardian \
+  -c "SELECT collected_at, hostname, cpu_percent, ram_percent, disk_percent FROM system_metrics ORDER BY collected_at DESC LIMIT 10;"
+```
+
+### 8. Run the collector with systemd
+
+```bash
+sudo cp systemd/infraguardian-collector.service \
+  /etc/systemd/system/infraguardian-collector.service
+
+sudo systemctl daemon-reload
+sudo systemctl enable --now infraguardian-collector
+```
+
+Validate:
+
+```bash
+systemctl status infraguardian-collector --no-pager
+journalctl -u infraguardian-collector -n 50 --no-pager
+```
+
+### 9. Validate Grafana
+
+Open:
+
+```text
+http://<server-ip>:3000
+```
+
+The provisioned **InfraGuardian Host Overview** dashboard should display the host data written to `system_metrics`.
+
+### 10. Reboot validation
+
+A deployment should survive a host reboot without manual intervention.
+
+```bash
+sudo reboot
+```
+
+After reconnecting:
+
+```bash
+cd /opt/infraguardian
+systemctl status docker --no-pager
+systemctl status infraguardian-collector --no-pager
+docker compose ps
+curl -I http://localhost:3000
+```
+
+Then confirm that new rows continue to appear in `system_metrics`.
+
+See [VALIDATION.md](VALIDATION.md) for the clean-VM validation record.
 
 ## Engineering principles
 
@@ -218,7 +283,7 @@ Future work includes:
 
 This public repository contains only generic configuration and example values. Production credentials, internal hostnames, private addressing and organization-specific data should remain outside the repository.
 
-The default Compose file publishes PostgreSQL and Grafana ports on the host. For production use, exposure should be restricted with host firewall rules, network segmentation or a reverse proxy as appropriate.
+The default configuration is intended for an isolated lab. PostgreSQL is published on TCP/5432 because host-based and remote collectors may need database access. In a real deployment, restrict that port with host/network firewall rules or change the Compose binding to match the intended collector topology.
 
 ## Portfolio context
 
