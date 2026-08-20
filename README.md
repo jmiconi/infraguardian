@@ -140,13 +140,19 @@ Expected state:
 - `ig-grafana` becomes `Up`
 - Grafana listens on TCP/3000
 
-Validate Grafana locally:
+`docker compose up -d` returning successfully means the containers were started; Grafana may still need a few seconds before its HTTP endpoint is ready. Wait for application readiness instead of assuming container state means HTTP readiness:
 
 ```bash
+until curl -fsS -o /dev/null http://localhost:3000/login; do
+  echo "Waiting for Grafana..."
+  sleep 2
+done
+
+echo "Grafana is ready"
 curl -I http://localhost:3000
 ```
 
-A `302` redirect to `/login` confirms that Grafana is responding.
+A `302` redirect to `/login` from the root endpoint confirms that Grafana is responding.
 
 Validate the database schema:
 
