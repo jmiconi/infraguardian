@@ -80,36 +80,104 @@ infraguardian/
 
 ## Quick start
 
+### Prerequisites
+
+Validated on **Ubuntu Server 24.04.4 LTS**.
+
+A fresh host needs only Git, curl and CA certificates before cloning the repository:
+
+```bash
+sudo apt update
+sudo apt install -y git curl ca-certificates
+```
+
 ### 1. Clone
 
 ```bash
-git clone https://github.com/jmiconi/infraguardian.git
-cd infraguardian
+sudo git clone https://github.com/jmiconi/infraguardian.git /opt/infraguardian
+sudo chown -R "$USER":"$USER" /opt/infraguardian
+cd /opt/infraguardian
 ```
 
-### 2. Review configuration
+### 2. Bootstrap Docker
 
-Use the example environment files as a starting point and keep real credentials outside version control.
+The repository includes a bootstrap script that installs Docker when it is not already present and adds the current user to the `docker` group.
 
 ```bash
+chmod +x setup.sh
+./setup.sh
+```
+
+If the script adds your account to the `docker` group, log out and log back in before continuing:
+
+```bash
+exit
+```
+
+After reconnecting, verify access:
+
+```bash
+groups
+docker --version
+docker compose version
+docker ps
+```
+
+The `groups` output should include `docker` and `docker ps` should work without `sudo`.
+
+### 3. Review configuration
+
+Use the example environment file as a starting point and keep real credentials outside version control.
+
+```bash
+cd /opt/infraguardian
 cp .env.example .env
 ```
 
-Adjust values for your environment before deployment.
+Change the example PostgreSQL password before starting the stack.
 
-### 3. Start the platform
+### 4. Validate Compose configuration
+
+```bash
+docker compose config
+```
+
+This catches missing variables and Compose syntax problems before containers are started.
+
+### 5. Start the platform
 
 ```bash
 docker compose up -d
 ```
 
-### 4. Validate containers
+### 6. Validate containers
 
 ```bash
 docker compose ps
+docker compose logs --tail=100 postgres
+docker compose logs --tail=100 grafana
 ```
 
-Grafana can then be used to inspect the metrics stored by the collectors.
+Expected core services:
+
+- `ig-postgres` — healthy
+- `ig-grafana` — running
+
+Grafana is exposed on TCP port `3000` by the default Compose configuration.
+
+## Validation status
+
+The deployment procedure is being tested from clean VM snapshots rather than only from an already-prepared development machine.
+
+Current validated baseline:
+
+- Ubuntu Server 24.04.4 LTS
+- Docker Engine 29.x installed successfully by `setup.sh`
+- Docker Compose plugin 5.x installed successfully by `setup.sh`
+- clean Git clone to `/opt/infraguardian`
+- Docker daemon enabled and started by the bootstrap process
+
+Further validation covers PostgreSQL initialization, Grafana provisioning, collector execution, persistence and reboot behavior.
 
 ## Engineering principles
 
@@ -149,6 +217,8 @@ Future work includes:
 ## Security
 
 This public repository contains only generic configuration and example values. Production credentials, internal hostnames, private addressing and organization-specific data should remain outside the repository.
+
+The default Compose file publishes PostgreSQL and Grafana ports on the host. For production use, exposure should be restricted with host firewall rules, network segmentation or a reverse proxy as appropriate.
 
 ## Portfolio context
 
