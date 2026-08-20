@@ -1,132 +1,159 @@
 # InfraGuardian
 
-InfraGuardian es una plataforma de **observabilidad para infraestructura
-on‑premise** diseñada como proyecto de aprendizaje DevOps/SRE y como
-base para un sistema real de monitoreo.
+Infrastructure observability platform for **Windows and Linux environments**, built around lightweight collectors, PostgreSQL and Grafana.
 
-El objetivo es construir una solución simple, portable y extensible que
-permita:
+InfraGuardian is designed as a practical infrastructure engineering project: collect operational data from heterogeneous hosts, persist historical metrics, visualize system health and provide a foundation for automation and capacity analysis.
 
--   Monitorear múltiples hosts
--   Analizar métricas históricas
--   Detectar saturación de recursos
--   Servir como base para análisis con IA
+## Why this project exists
 
-------------------------------------------------------------------------
+Traditional infrastructure environments often grow around multiple operating systems, isolated monitoring scripts and manual troubleshooting. InfraGuardian explores a simple, auditable architecture that keeps collection, storage and visualization separated.
+
+The goal is not to replace every monitoring platform. It is to provide a transparent stack that can be understood, deployed and extended by an infrastructure team.
+
+## Architecture
+
+```text
+┌─────────────────┐        ┌─────────────────┐
+│  Linux hosts    │        │  Windows hosts  │
+│ Python collector│        │ PS/Python agent │
+└────────┬────────┘        └────────┬────────┘
+         │                          │
+         └────────────┬─────────────┘
+                      ▼
+               ┌────────────┐
+               │ PostgreSQL │
+               │ historical │
+               │  metrics   │
+               └─────┬──────┘
+                     ▼
+               ┌────────────┐
+               │  Grafana   │
+               │ dashboards │
+               └────────────┘
+```
+
+See [ARCHITECTURE.md](ARCHITECTURE.md) for the design in more detail.
+
+## What it collects
+
+Current collectors are designed around host-level infrastructure metrics such as:
+
+- CPU utilization
+- memory utilization
+- disk utilization
+- process count
+- network traffic
+- hostname / node identity
+- collection timestamps
+
+The repository includes implementations and deployment material for both Linux and Windows-oriented collection.
 
 ## Stack
 
--   Docker
--   Docker Compose
--   PostgreSQL
--   Grafana
--   Python
--   Bash
--   Windows PowerShell (para deploy en Windows)
+| Layer | Technology |
+|---|---|
+| Collection | Python, PowerShell, psutil |
+| Storage | PostgreSQL |
+| Visualization | Grafana |
+| Runtime | Docker / Docker Compose |
+| Linux operations | Bash, systemd |
+| Windows operations | PowerShell |
+| Configuration | Environment variables / example configuration files |
 
-------------------------------------------------------------------------
+## Repository structure
 
-## Arquitectura
+```text
+infraguardian/
+├── collector/          # collector implementation
+├── windows/            # Windows collector/deployment material
+├── db/                 # database initialization
+├── grafana/            # provisioning and dashboards
+├── deploy/             # deployment helpers
+├── systemd/            # Linux service integration
+├── scripts/            # operational scripts
+├── docker-compose.yml
+├── setup.sh
+├── ARCHITECTURE.md
+├── COLLECTORS.md
+└── DEVOPS_WORKFLOW.md
+```
 
-InfraGuardian sigue un modelo simple de **collector → base de datos →
-visualización**.
+## Quick start
 
-Host Metrics\
-↓\
-Python Collector\
-↓\
-PostgreSQL\
-↓\
-Grafana Dashboards
+### 1. Clone
 
-Los collectors se ejecutan en cada host y envían métricas periódicamente
-a PostgreSQL.
+```bash
+git clone https://github.com/jmiconi/infraguardian.git
+cd infraguardian
+```
 
-Grafana consulta PostgreSQL para generar dashboards.
+### 2. Review configuration
 
-------------------------------------------------------------------------
+Use the example environment files as a starting point and keep real credentials outside version control.
 
-## Estructura del repositorio
+```bash
+cp .env.example .env
+```
 
-    infraguardian
-    │
-    ├ collector
-    │   ├ collector.py
-    │   ├ requirements.txt
-    │   └ config.env.example
-    │
-    ├ windows
-    │   └ v2-python
-    │       ├ collector.py
-    │       ├ requirements.txt
-    │       ├ config.env.example
-    │       └ install_collector.ps1
-    │
-    ├ db
-    │   └ init
-    │
-    ├ grafana
-    │   ├ dashboards
-    │   └ provisioning
-    │
-    ├ docker-compose.yml
-    └ README.md
+Adjust values for your environment before deployment.
 
-------------------------------------------------------------------------
+### 3. Start the platform
 
-## Deploy rápido
+```bash
+docker compose up -d
+```
 
-### 1 Clonar repositorio
+### 4. Validate containers
 
-    git clone https://github.com/jmiconi/infraguardian.git
-    cd infraguardian
+```bash
+docker compose ps
+```
 
-### 2 Configurar variables
+Grafana can then be used to inspect the metrics stored by the collectors.
 
-    cp collector/config.env.example collector/config.env
+## Engineering principles
 
-Editar con tus valores.
+This project intentionally emphasizes operational concerns that matter in real infrastructure:
 
-------------------------------------------------------------------------
+- configuration and secrets are separated from code
+- Linux services can be managed through systemd
+- Windows deployment is automated with PowerShell
+- infrastructure state is persisted for historical analysis
+- dashboards are provisioned as part of the platform
+- components are kept loosely coupled so they can evolve independently
 
-### 3 Levantar stack
+## Current scope
 
-    docker compose up -d
+Implemented or represented in the repository:
 
-------------------------------------------------------------------------
+- Linux host collection
+- Windows host collection/deployment
+- PostgreSQL metric persistence
+- Grafana provisioning and dashboards
+- Docker Compose deployment
+- systemd integration
+- operational documentation
 
-### 4 Acceder a Grafana
+## Roadmap
 
-    http://localhost:3000
+Future work includes:
 
-------------------------------------------------------------------------
+- richer multi-host inventory and metadata
+- alerting and health-state evaluation
+- service-specific checks
+- anomaly detection
+- capacity forecasting
+- integration with centralized logging
+- AI-assisted infrastructure analysis
 
-## Objetivos del proyecto
+## Security
 
-InfraGuardian busca evolucionar hacia:
+This public repository contains only generic configuration and example values. Production credentials, internal hostnames, private addressing and organization-specific data should remain outside the repository.
 
--   monitoreo multi‑host
--   análisis histórico de infraestructura
--   detección automática de anomalías
--   predicción de saturación mediante IA
+## Portfolio context
 
-------------------------------------------------------------------------
+InfraGuardian represents the kind of work I focus on as an infrastructure engineer: **automation, observability, cross-platform operations and building systems that remain understandable when they need to be troubleshot under pressure**.
 
-## Estado actual
+---
 
-Versión estable:
-
-    v0.x – Observabilidad básica
-
-Incluye:
-
--   collector Linux
--   collector Windows
--   PostgreSQL
--   Grafana dashboards
-
-------------------------------------------------------------------------
-
-## Autor
-
-Proyecto desarrollado por **InfraGuardian**
+Built and maintained by [Julián Miconi](https://github.com/jmiconi).
